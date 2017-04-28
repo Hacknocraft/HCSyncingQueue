@@ -11,9 +11,18 @@ import XCTest
 
 class HCSyncingQueueTests: XCTestCase {
 
+    let testQueueKey = "test_queue"
+    let initialSyncItems = ["1", "2", "3", "4"]
+
     override func setUp() {
         super.setUp()
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+
+        var syncingQueue = HCSyncingQueue.getQueue(withKey: testQueueKey)
+        HCSyncingQueue.removeQueue(withKey: testQueueKey)
+        syncingQueue = HCSyncingQueue.getQueue(withKey: testQueueKey)
+        for item in initialSyncItems {
+            syncingQueue.enqueue(item: item)
+        }
     }
 
     override func tearDown() {
@@ -21,15 +30,16 @@ class HCSyncingQueueTests: XCTestCase {
         super.tearDown()
     }
 
-    func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-    }
+    func testGetSyncItems() {
 
-    func testPerformanceExample() {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
-        }
+        let syncingQueue = HCSyncingQueue.getQueue(withKey: "test_queue")
+        syncingQueue.enqueue(item: "4") // this shouldn't change count
+        var count = syncingQueue.getSyncingItems()?.count
+        XCTAssertTrue(count ?? 0 == initialSyncItems.count)
+
+        syncingQueue.enqueue(item: "4")
+        syncingQueue.cleanCurrentSyncingQueue()
+        count = syncingQueue.getSyncingItems()?.count
+        XCTAssertTrue(count ?? 0 == 1)
     }
 }

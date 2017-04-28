@@ -8,7 +8,12 @@
 
 import Foundation
 
-open class HCSyncingQueue: NSCoder {
+/// This queue solves the problem for asynchronous data requests queue.
+/// Because the operation can fail and we need to put the dequeue items back,
+/// there are two queues. One holds the items waiting to be sent, and other queue holds
+/// the items which is currently being sent. Once sending is finished, you should call
+/// `cleanCurrentSyncingQueue` to clean up the current syncing queue.
+open class HCSyncingQueue: NSObject, NSCoding {
 
     private static var syncingQueues: [String: HCSyncingQueue]?
 
@@ -19,22 +24,21 @@ open class HCSyncingQueue: NSCoder {
     // add a prefix to avoid clash
     private static let prefix               = "hc_sync_"
 
-    private var pendingSyncQueue: [AnyHashable]
-    private var currentSyncQueue: [AnyHashable]
+    private var pendingSyncQueue = [AnyHashable]()
+    private var currentSyncQueue = [AnyHashable]()
 
-    static func getSavedQueues() -> [String: HCSyncingQueue] {
+    private static func getSavedQueues() -> [String: HCSyncingQueue] {
 
-        if syncingQueues == nil {
-            syncingQueues = UserDefaults.standard
-                .object(forKey: HCSyncingQueue.pendingSyncQueueKey) as? [String: HCSyncingQueue]
-        }
-        if syncingQueues == nil {
-            syncingQueues = [String: HCSyncingQueue]()
+        if syncingQueues == nil,
+            let decoded = UserDefaults.standard
+                .object(forKey: HCSyncingQueue.persistentKey) as? Data {
+            syncingQueues = NSKeyedUnarchiver
+                .unarchiveObject(with: decoded) as? [String: HCSyncingQueue]
         }
         return syncingQueues ?? [String: HCSyncingQueue]()
     }
 
-    open static func queue(withKey key: String) -> HCSyncingQueue {
+    open static func getQueue(withKey key: String) -> HCSyncingQueue {
 
         // add a prefix to avoid clash
         let domainKey = "\(HCSyncingQueue.prefix)\(key)"
@@ -44,18 +48,29 @@ open class HCSyncingQueue: NSCoder {
         } else {
             let syncQueue = HCSyncingQueue()
             savedQueues[domainKey] = syncQueue
+            HCSyncingQueue.syncingQueues = savedQueues
             return syncQueue
         }
     }
 
-    override init() {
-        pendingSyncQueue = UserDefaults.standard
-            .object(forKey: HCSyncingQueue.pendingSyncQueueKey) as? [AnyHashable]
-            ?? [AnyHashable]()
-        currentSyncQueue = UserDefaults.standard
-            .object(forKey: HCSyncingQueue.pendingSyncQueueKey) as? [AnyHashable]
-            ?? [AnyHashable]()
+    open static func removeQueue(withKey key: String) {
+        HCSyncingQueue.syncingQueues?.removeValue(forKey: "\(HCSyncingQueue.prefix)\(key)")
+        save()
     }
+
+    // MARK: - persistence
+
+    open static func save() {
+        /// save the queue to UserDefault
+        if let queue = HCSyncingQueue.syncingQueues {
+            let encodedData: Data = NSKeyedArchiver.archivedData(withRootObject: queue)
+            UserDefaults.standard.set(encodedData,
+                                      forKey: HCSyncingQueue.persistentKey)
+            UserDefaults.standard.synchronize()
+        }
+    }
+
+    override init() {}
 
     required public init(coder decoder: NSCoder) {
         self.pendingSyncQueue = decoder.decodeObject(forKey: HCSyncingQueue.pendingSyncQueueKey)
@@ -64,18 +79,9 @@ open class HCSyncingQueue: NSCoder {
             as? [AnyHashable] ?? [AnyHashable]()
     }
 
-    func encode(with coder: NSCoder) {
+    public func encode(with coder: NSCoder) {
         coder.encode(pendingSyncQueue, forKey: HCSyncingQueue.pendingSyncQueueKey)
         coder.encode(currentSyncQueue, forKey: HCSyncingQueue.currentSyncQueueKey)
-    }
-
-    // MARK: - persistence
-
-    open func save() {
-        /// save the queue to UserDefault
-        UserDefaults.standard.set(HCSyncingQueue.syncingQueues,
-                                  forKey: HCSyncingQueue.persistentKey)
-        UserDefaults.standard.synchronize()
     }
 
     // MARK: - enqueue and dequeue
@@ -83,6 +89,7 @@ open class HCSyncingQueue: NSCoder {
     open func enqueue(item: AnyHashable) {
         if !self.pendingSyncQueue.contains(item) {
             self.pendingSyncQueue.append(item)
+            HCSyncingQueue.save()
         }
     }
 
@@ -98,6 +105,6 @@ open class HCSyncingQueue: NSCoder {
 
     open func cleanCurrentSyncingQueue() {
         currentSyncQueue.removeAll()
-        save()
+        HCSyncingQueue.save()
     }
 }
