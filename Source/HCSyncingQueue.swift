@@ -98,13 +98,13 @@ open class HCSyncingQueue: NSObject, NSCoding {
             return currentSyncQueue
         } else {
             currentSyncQueue.append(contentsOf: self.pendingSyncQueue)
-            self.pendingSyncQueue.removeAll()
+            self.pendingSyncQueue = [AnyHashable]()
         }
         return currentSyncQueue
     }
 
     open func cleanCurrentSyncingQueue() {
-        currentSyncQueue.removeAll()
+        currentSyncQueue = [AnyHashable]()
         HCSyncingQueue.save()
     }
 }
