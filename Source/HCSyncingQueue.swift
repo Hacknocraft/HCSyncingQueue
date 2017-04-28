@@ -93,7 +93,7 @@ open class HCSyncingQueue: NSObject, NSCoding {
         }
     }
 
-    open func getSyncingItems() -> [AnyHashable]? {
+    open func getSyncingItems() -> [AnyHashable] {
         if currentSyncQueue.count > 0 {
             return currentSyncQueue
         } else {
