@@ -63,7 +63,7 @@ open class HCSyncingQueue: NSObject, NSCoding {
     open static func save() {
         /// save the queue to UserDefault
         if let queue = HCSyncingQueue.syncingQueues {
-            let encodedData: Data = NSKeyedArchiver.archivedData(withRootObject: queue)
+            let encodedData = NSKeyedArchiver.archivedData(withRootObject: queue)
             UserDefaults.standard.set(encodedData,
                                       forKey: HCSyncingQueue.persistentKey)
             UserDefaults.standard.synchronize()
